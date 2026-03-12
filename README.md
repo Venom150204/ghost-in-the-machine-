@@ -85,11 +85,20 @@ Open `notebooks/ghost_in_the_machine.ipynb` and run cells sequentially. All resu
 
 ## Key Findings
 
-*(Populated after experiments are complete)*
+- **All tiers achieve >99% accuracy** on both binary and 3-class tasks — current AI-generated prose is distinguishable from 19th-century literary text across multiple representation levels.
+- **Handcrafted features are surprisingly competitive** — XGBoost reaches 99.57% 3-class accuracy using only 23 interpretable features. AI text has measurable statistical fingerprints.
+- **SHAP reveals key discriminators:** MATTR (lexical diversity), semicolon density, and Flesch-Kincaid grade are the top features. Human Victorian prose uses more varied vocabulary and complex punctuation.
+- **DistilBERT+LoRA achieves perfect classification** (100% on both tasks) while training only 1.09% of parameters, showing authorship signals live in a narrow subspace of transformer representations.
+- **GA adversarial attacks partially succeed against XGBoost** — 2 of 3 AI samples crossed the 0.95 P(Human) threshold through Gemini-powered mutations, but deeper models remain robust.
+- **Style mimicry overshoots** — Gemini's "Victorian style" text is statistically *more extreme* than real Victorian prose, making it paradoxically easier to detect.
 
 ## Limitations and Future Work
 
-*(Populated after experiments are complete)*
+- **Dataset imbalance:** 5,211 human vs 500+500 AI paragraphs. Stratified splitting mitigates but doesn't eliminate the effect.
+- **Temporal specificity:** Human corpus is exclusively 19th-century British literature. Modern human writing would be harder to distinguish.
+- **Single AI source:** All AI text from Gemini. Different LLMs have different fingerprints — cross-model generalization is untested.
+- **GA attacks only target Tier A:** Gradient-based attacks on the transformer would be the natural next step.
+- **Future directions:** (1) Multi-source AI text from diverse LLMs, (2) gradient-based adversarial attacks on Tier C, (3) modern human text to test temporal robustness, (4) sentence-level detection, (5) ensemble of all tiers with confidence calibration.
 
 ## References
 

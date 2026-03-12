@@ -1,0 +1,5 @@
+,Model,Binary Acc,Binary F1,3-Class Acc,3-Class F1,C0-C2 Confusion
+0,Tier A xgboost,0.9968,0.9940,0.9957,0.9901,1
+1,Tier A random_forest,0.9957,0.9920,0.9936,0.9832,1
+2,Tier B1 GloVe FF-NN,0.9989,0.9980,1.0000,1.0000,0
+3,Tier B2 SBERT FF-NN,0.9989,0.9980,0.9989,0.9976,1

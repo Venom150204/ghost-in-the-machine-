@@ -34,5 +34,4 @@ desktop.ini
 *.bak
 *_backup.*
 
-# Claude
-.claude/
+

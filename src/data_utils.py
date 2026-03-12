@@ -56,6 +56,14 @@ def clean_gutenberg_text(filepath: str) -> str:
     )
     # Lines like "CONTENTS", "INTRODUCTION.", table-of-contents entries
     contents_pat = re.compile(r"^\s*CONTENTS\s*$", re.IGNORECASE)
+    # TOC entries: "I. In Chancery", "XIV. Deportment", etc.
+    toc_entry_pat = re.compile(r"^\s*[IVXLCDM]+\.\s+\S")
+    # Standalone section words
+    section_word_pat = re.compile(
+        r"^\s*(Preface|Dedication|Appendix|Epilogue|Prologue|Foreword"
+        r"|Introduction|Conclusion)\s*\.?\s*$",
+        re.IGNORECASE,
+    )
 
     for line in lines:
         stripped = line.strip()
@@ -79,6 +87,14 @@ def clean_gutenberg_text(filepath: str) -> str:
 
         # Skip contents line
         if contents_pat.match(stripped):
+            continue
+
+        # Skip TOC entries (Roman numeral + title)
+        if toc_entry_pat.match(stripped):
+            continue
+
+        # Skip standalone section words
+        if section_word_pat.match(stripped):
             continue
 
         cleaned_lines.append(stripped)
