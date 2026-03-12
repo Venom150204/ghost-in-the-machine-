@@ -1,0 +1,38 @@
+# Secrets
+.env
+*.key
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Large files (GloVe embeddings, BERTopic model)
+data/raw/glove*.txt
+outputs/models/bertopic_model
+outputs/models/distilbert_lora*/
+outputs/results/sbert_embeddings.npy
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# UV
+.python-version
+
+# IDE
+.vscode/
+.idea/
+
+# Backup files
+*.bak
+*_backup.*
+
+# Claude
+.claude/
