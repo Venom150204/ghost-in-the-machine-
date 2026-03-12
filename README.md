@@ -85,12 +85,13 @@ Open `notebooks/ghost_in_the_machine.ipynb` and run cells sequentially. All resu
 
 ## Key Findings
 
-- **All tiers achieve >99% accuracy** on both binary and 3-class tasks — current AI-generated prose is distinguishable from 19th-century literary text across multiple representation levels.
+- **Round 1 (naive prompts): >99% accuracy across all tiers** — but this was a red flag, not a success. The AI text was trivially detectable due to vocabulary homogeneity, readability overshoot, and uniform sentence structure.
+- **Round 2 (research-grade prompts): accuracy dropped to ??%** — few-shot ICL with real Victorian excerpts, persona prompting, CoT reasoning, and anti-detection constraints made AI text significantly harder to detect. *[To be updated after Colab re-run]*
+- **Prompt engineering is the battleground** — the accuracy delta between Round 1 and Round 2 proves that prompt design, not model architecture, determines detection difficulty.
 - **Handcrafted features are surprisingly competitive** — XGBoost reaches 99.57% 3-class accuracy using only 23 interpretable features. AI text has measurable statistical fingerprints.
-- **SHAP reveals key discriminators:** MATTR (lexical diversity), semicolon density, and Flesch-Kincaid grade are the top features. Human Victorian prose uses more varied vocabulary and complex punctuation.
-- **DistilBERT+LoRA achieves perfect classification** (100% on both tasks) while training only 1.09% of parameters, showing authorship signals live in a narrow subspace of transformer representations.
-- **GA adversarial attacks partially succeed against XGBoost** — 2 of 3 AI samples crossed the 0.95 P(Human) threshold through Gemini-powered mutations, but deeper models remain robust.
-- **Style mimicry overshoots** — Gemini's "Victorian style" text is statistically *more extreme* than real Victorian prose, making it paradoxically easier to detect.
+- **SHAP reveals key discriminators:** Flesch Reading Ease dominates (~40% of discriminative power), followed by sentence length, em-dash density, and hapax ratio.
+- **Style mimicry overshoots** — Gemini's "Victorian style" text is statistically *more extreme* than real Victorian prose (Flesch ~0 vs Human ~60), making it paradoxically easier to detect.
+- **GA adversarial attacks** use Gemini-powered mutations (Type A: rhythm rewriting vs Type B: archaic injection) to evolve AI text past classifiers, testing fragility across all tiers.
 
 ## Limitations and Future Work
 

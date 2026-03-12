@@ -173,12 +173,22 @@ def generate_gemini_paragraphs(
     prompt_template: str,
     total_count: int,
     output_path: str,
-    model_name: str = "gemini-2.5-flash-lite",
-    rate_limit_sleep: float = 0.1,  # 1K RPM paid tier, ~1.5s response time
+    model_name: str = "gemini-2.5-flash",
+    rate_limit_sleep: float = 0.1,
+    temperature: float = 0.8,
+    max_output_tokens: int = 300,
+    top_p: float = 0.9,
+    max_workers: int = 10,
 ) -> list[dict]:
     """
     Generates paragraphs via the Gemini API, distributing evenly across topics.
-    Saves results incrementally to disk (crash-safe).
+    Uses concurrent workers for speed. Saves results incrementally to disk (crash-safe).
+
+    Args:
+        temperature: Sampling temperature (higher = more diverse).
+        max_output_tokens: Max tokens per response.
+        top_p: Nucleus sampling threshold.
+        max_workers: Number of concurrent API workers.
 
     Returns list of dicts: {text, topic, word_count}
     """
@@ -186,8 +196,16 @@ def generate_gemini_paragraphs(
     api_key = os.getenv("GEMINI_API_KEY")
     print(f"  Model: {model_name}")
     print(f"  API key: {'set (' + api_key[:8] + '...)' if api_key else 'MISSING!'}")
+    print(f"  Generation config: temp={temperature}, top_p={top_p}, max_tokens={max_output_tokens}")
+    print(f"  Concurrency: {max_workers} workers")
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(model_name)
+
+    gen_config = genai.types.GenerationConfig(
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
+        top_p=top_p,
+    )
 
     # Quick test call to verify the model works before starting the loop
     print("  Testing API connection...", flush=True)
@@ -213,43 +231,64 @@ def generate_gemini_paragraphs(
     for r in results:
         existing_counts[r["topic"]] = existing_counts.get(r["topic"], 0) + 1
 
+    # Build the full work list: (topic, prompt) pairs for all remaining paragraphs
+    work_items = []
     for i, topic in enumerate(topics):
         target = per_topic + (1 if i < remainder else 0)
         already_done = existing_counts.get(topic, 0)
         needed = target - already_done
+        for _ in range(needed):
+            work_items.append(topic)
 
-        if needed <= 0:
-            continue
+    if not work_items:
+        print("All paragraphs already generated.")
+        return results
 
-        print(f"Generating {needed} paragraphs for topic: '{topic}'")
-        for j in tqdm(range(needed), desc=topic[:30]):
-            prompt = prompt_template.format(topic_name=topic)
-            # Retry up to 5 times with exponential backoff
-            for attempt in range(5):
-                try:
-                    response = model.generate_content(
-                        prompt,
-                        request_options={"timeout": 60},  # 60s timeout (thinking models need more)
-                    )
-                    text = response.text.strip()
-                    results.append({
-                        "text": text,
-                        "topic": topic,
-                        "word_count": len(text.split()),
-                    })
+    print(f"Generating {len(work_items)} paragraphs across {len(topics)} topics...")
+
+    # Thread-safe lock for results list and file saving
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    lock = threading.Lock()
+    save_counter = [0]  # mutable counter for incremental saves
+
+    def _generate_one(topic):
+        """Generate a single paragraph with retry logic."""
+        prompt = prompt_template.format(topic_name=topic)
+        for attempt in range(5):
+            try:
+                response = model.generate_content(
+                    prompt,
+                    generation_config=gen_config,
+                    request_options={"timeout": 60},
+                )
+                text = response.text.strip()
+                time.sleep(rate_limit_sleep)
+                return {"text": text, "topic": topic, "word_count": len(text.split())}
+            except Exception as e:
+                wait = rate_limit_sleep * (2 ** attempt) + 1
+                print(f"  API error (attempt {attempt+1}/5): {type(e).__name__}. Retrying in {wait:.0f}s...")
+                time.sleep(wait)
+        print(f"  FAILED after 5 retries on topic='{topic}', skipping.")
+        return None
+
+    # Use ThreadPoolExecutor for concurrent generation
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_generate_one, topic): topic for topic in work_items}
+        pbar = tqdm(total=len(work_items), desc="Generating")
+
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                with lock:
+                    results.append(result)
+                    save_counter[0] += 1
                     # Save incrementally every 10 paragraphs
-                    if len(results) % 10 == 0:
+                    if save_counter[0] % 10 == 0:
                         with open(output_path, "w", encoding="utf-8") as f:
                             json.dump(results, f, indent=2, ensure_ascii=False)
-                    break  # success — exit retry loop
-                except Exception as e:
-                    wait = rate_limit_sleep * (2 ** attempt)  # exponential backoff
-                    print(f"  API error (attempt {attempt+1}/5): {type(e).__name__}. Retrying in {wait:.0f}s...")
-                    time.sleep(wait)
-            else:
-                print(f"  FAILED after 5 retries on topic='{topic}', skipping this paragraph.")
-
-            time.sleep(rate_limit_sleep)
+            pbar.update(1)
+        pbar.close()
 
     # Final save
     with open(output_path, "w", encoding="utf-8") as f:

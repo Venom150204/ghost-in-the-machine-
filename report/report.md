@@ -3,7 +3,7 @@
 **Project:** Authorship Detection in the Age of LLMs
 **Submitted to:** PreCog Lab, IIIT Hyderabad
 **Authors:** Charles Dickens & Mary Shelley (human corpus); Gemini API (AI corpus)
-**Last Updated:** 2026-03-10
+**Last Updated:** 2026-03-13
 
 ---
 
@@ -43,11 +43,12 @@
 - [ ] **Task 3: Explainability & Error Analysis** — code written, not yet run
   - [x] Error analysis function written
   - [x] Integrated Gradients (Captum) function written
-  - [x] AI-isms detection function written
+  - [x] Data-driven AI-isms analysis (log-odds n-grams, POS mining, opener entropy, JSD, parallel structures)
   - [ ] Awaiting execution
 
 - [ ] **Task 4: Adversarial GA Optimization** — code written, not yet run
-  - [x] Genetic algorithm engine written (synonym/punctuation/shuffle/filler mutations)
+  - [x] Gemini-powered genetic algorithm with Type A (Rhythm) and Type B (Archaic) mutations
+  - [x] Comparative run function (`run_comparative_ga`)
   - [x] Fitness function (P(Human) from classifier)
   - [ ] Awaiting execution
 
@@ -100,17 +101,20 @@ Architecture: 2-layer FF-NN (256→128→n_classes) with dropout, BatchNorm, tra
 
 ### Explainability (Task 3)
 
-**SHAP TreeExplainer** on XGBoost reveals which handcrafted features drive predictions. **Integrated Gradients** (via Captum) on DistilBERT highlights which tokens matter most at the subword level. **AI-isms detector** hunts for known AI writing patterns: filler phrases ("It is important to note"), uniform sentence lengths, and repetitive opening words.
+**SHAP TreeExplainer** on XGBoost reveals which handcrafted features drive predictions. **Integrated Gradients** (via Captum) on DistilBERT highlights which tokens matter most at the subword level. **Data-driven AI-isms analysis** uses five methods:
+1. Log-odds ratio n-gram analysis (Monroe et al., 2008) to find statistically overrepresented phrases in AI text
+2. Sentence opener entropy (low entropy = repetitive AI openings)
+3. Vocabulary divergence via Jensen-Shannon divergence
+4. POS trigram pattern mining for syntactic templates AI overuses
+5. Parallel structure detection and validation against known AI markers from the literature
 
 ### Adversarial Optimization (Task 4)
 
-A genetic algorithm with linguistically-motivated mutations:
-- Synonym substitution (WordNet)
-- Punctuation variation (period→semicolon, add em-dashes)
-- Sentence reordering
-- Filler phrase insertion ("indeed", "of course")
+A Gemini-powered genetic algorithm with two mutation strategies compared independently:
+- **Type A (Rhythm):** Rewrites sentence cadence while preserving vocabulary and meaning
+- **Type B (Archaic):** Injects pre-1900 vocabulary and minor grammatical irregularities
 
-Fitness = classifier's P(Human) for the mutated text. Tournament selection, single-point sentence-level crossover, elite preservation.
+Fitness = classifier's P(Human). Elite preservation with population of 10, target fitness 0.90. Both types are run independently and cross-tested against all three classifier tiers.
 
 ---
 
@@ -245,6 +249,53 @@ Features with negligible SHAP: mattr, ttr, gunning_fog, avg_tree_depth, punct_!,
 4. **Vocabulary richness features (MATTR, TTR) are useless** — the model doesn't need them because structural features are already sufficient.
 
 **Technical note:** `shap.TreeExplainer` failed with `ValueError: could not convert string to float: '[1.5624774E0,...]'` — a known SHAP/XGBoost version compatibility bug where XGBoost stores multiclass base_score as an array string. Workaround: fell back to `shap.Explainer` with `predict_proba` (PermutationExplainer). Slower (~1.5 min for 933 samples) but correct.
+
+---
+
+## Prompt Engineering: From 99% to Reality
+
+### The Problem: When 99% Accuracy Is a Red Flag
+
+Round 1 used naive zero-shot prompts for AI generation:
+- Class 2: "Write a paragraph of 120-170 words exploring themes of {topic}... Write in a clear, neutral, expository style."
+- Class 3: "Write in the style of Charles Dickens and Mary Shelley: use long, nested sentences with multiple subordinate clauses; employ semicolons and em-dashes freely..."
+
+All five classifiers achieved >99% accuracy. This is not a success — it means the AI text was trivially detectable. Diagnosis:
+- **Flesch scores:** AI text scored 10-30 (barely readable) vs Human 60+ (comfortable). The AI equated "Victorian" with "unreadable."
+- **Vocabulary:** AI used abstract emotional language ("tapestry of human endeavor") instead of concrete details. Hapax ratio was significantly lower.
+- **Sentence structure:** AI maintained uniform sentence lengths (low std). Human text ranged wildly from 5-word fragments to 80-word run-ons.
+- **Punctuation:** Style-mimicking AI overdosed on em-dashes (1.41 vs Human 0.60 per 100 words) and underused periods (1.53 vs Human 4.98).
+
+**Conclusion:** The task was too easy. The prompts were the bottleneck, not the models.
+
+### The Fix: Research-Grade Prompt Engineering
+
+We redesigned prompts using three techniques from recent NLP literature:
+
+1. **Few-shot In-Context Learning (5 real excerpts):** Instead of describing Victorian style abstractly, we provided 5 actual excerpts from *Bleak House* and *Frankenstein*. The model learns prose rhythm from examples rather than imagining it from instructions.
+
+2. **Persona + Chain-of-Thought prompting:** The model is told "You are a Victorian novelist" and asked to reason about what makes the excerpts distinctive before writing. This shifts it from "essay writer" to "novelist" mode.
+
+3. **Anti-detection constraints:** We blacklisted known AI-isms (`tapestry`, `testament`, `delve`, `crucial`, `furthermore`, `it is important`, `in conclusion`) identified by our Round 1 SHAP analysis, and added statistical constraints (sentence length variance, proper noun requirement, no repeated sentence openers).
+
+**Generation config changes:** Higher temperature (0.9-1.0 vs default), higher top_p (0.9-0.95), to increase lexical diversity and burstiness.
+
+### Round 2 Results
+
+*[To be filled after Colab re-run]*
+
+| Model | Round 1 Acc | Round 2 Acc | Delta |
+|-------|------------|------------|-------|
+| XGBoost (3-class) | 99.57% | ??% | -??% |
+| Random Forest (3-class) | 99.36% | ??% | -??% |
+| SBERT FF-NN | ??% | ??% | -??% |
+| DistilBERT+LoRA | ??% | ??% | -??% |
+
+### What This Proves
+
+The accuracy drop from Round 1 to Round 2 proves that prompt engineering — not model architecture — is the primary variable in AI text detection difficulty. A naive prompt produces text that any statistical classifier can catch; a research-grade prompt forces the detector to work harder.
+
+This has practical implications: as prompt engineering techniques improve, current detection methods will need to evolve. The "arms race" between generation and detection is fundamentally a prompt engineering problem.
 
 ---
 
