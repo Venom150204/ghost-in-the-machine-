@@ -281,7 +281,7 @@ def run_comparative_ga(
     Returns:
         dict with keys "type_a" and "type_b", each containing the GA results.
     """
-    ga = TextGeneticAlgorithm(
+    ga_kwargs = dict(
         classifier_fn=classifier_fn,
         topic=topic,
         author_style_prompt=author_style_prompt,
@@ -296,15 +296,13 @@ def run_comparative_ga(
 
     if verbose:
         print("Running GA with Type A (Rhythm) mutations...")
-    results_a = ga.run(mutation_type="A", verbose=verbose)
-
-    # Reset seed for fair comparison
-    random.seed(seed)
-    np.random.seed(seed)
+    ga_a = TextGeneticAlgorithm(**ga_kwargs)
+    results_a = ga_a.run(mutation_type="A", verbose=verbose)
 
     if verbose:
         print("\n\nRunning GA with Type B (Archaic) mutations...")
-    results_b = ga.run(mutation_type="B", verbose=verbose)
+    ga_b = TextGeneticAlgorithm(**ga_kwargs)
+    results_b = ga_b.run(mutation_type="B", verbose=verbose)
 
     return {
         "type_a": results_a,

@@ -18,15 +18,21 @@ nlp = spacy.load("en_core_web_sm")
 # Lexical Richness
 # ---------------------------------------------------------------------------
 
-def compute_ttr(text: str) -> float:
+def _tokenize_words(text: str) -> list[str]:
+    """Lowercase word tokenization, used by all lexical features."""
+    return text.lower().split()
+
+
+def compute_ttr(text: str, words: list[str] | None = None) -> float:
     """Raw Type-Token Ratio: unique words / total words."""
-    words = text.lower().split()
+    if words is None:
+        words = _tokenize_words(text)
     if not words:
         return 0.0
     return len(set(words)) / len(words)
 
 
-def compute_mattr(text: str, window: int = 50) -> float:
+def compute_mattr(text: str, window: int = 50, words: list[str] | None = None) -> float:
     """
     Moving Average Type-Token Ratio (Covington & McFall, 2010).
     Computes TTR over a sliding window and averages, correcting for
@@ -34,9 +40,10 @@ def compute_mattr(text: str, window: int = 50) -> float:
     lower raw TTR because repeated function words accumulate; MATTR
     avoids this by never looking at more than `window` tokens at once.
     """
-    words = text.lower().split()
+    if words is None:
+        words = _tokenize_words(text)
     if len(words) < window:
-        return compute_ttr(text)
+        return compute_ttr(text, words=words)
 
     ttrs = []
     for i in range(len(words) - window + 1):
@@ -45,13 +52,14 @@ def compute_mattr(text: str, window: int = 50) -> float:
     return float(np.mean(ttrs))
 
 
-def compute_hapax_ratio(text: str) -> float:
+def compute_hapax_ratio(text: str, words: list[str] | None = None) -> float:
     """
     Hapax Legomena Ratio: words appearing exactly once / total unique words.
     Hypothesis: human authors take more lexical risks, producing more
     single-use words. AI text tends to recycle a narrower vocabulary.
     """
-    words = text.lower().split()
+    if words is None:
+        words = _tokenize_words(text)
     if not words:
         return 0.0
     freq = Counter(words)
@@ -168,10 +176,11 @@ def extract_all_features(text: str) -> dict:
     """
     features = {}
 
-    # Lexical
-    features["ttr"] = compute_ttr(text)
-    features["mattr"] = compute_mattr(text, window=50)
-    features["hapax_ratio"] = compute_hapax_ratio(text)
+    # Lexical (tokenize once, reuse word list)
+    words = _tokenize_words(text)
+    features["ttr"] = compute_ttr(text, words=words)
+    features["mattr"] = compute_mattr(text, window=50, words=words)
+    features["hapax_ratio"] = compute_hapax_ratio(text, words=words)
 
     # Syntactic
     features.update(compute_syntactic_features(text))

@@ -16,8 +16,12 @@ import re
 import numpy as np
 import pandas as pd
 import torch
+import spacy
 from collections import Counter
 from captum.attr import IntegratedGradients
+
+# Load spaCy model once (POS-only variant for efficiency)
+_nlp_pos = spacy.load("en_core_web_sm", disable=["ner", "lemmatizer"])
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +134,7 @@ def compute_log_odds_ngrams(ai_texts, human_texts, ns=(1, 2, 3), top_k=30, min_c
         DataFrame with columns: ngram, n, ai_count, human_count, log_odds, z_score
         Sorted by z_score descending (most AI-distinctive first).
     """
-    # Build frequency dictionaries per class
+    # Build frequency dictionaries per class (tokenize each text once)
     ai_freq = Counter()
     human_freq = Counter()
 
@@ -279,8 +283,7 @@ def detect_pos_patterns(texts, class_labels, class_names, top_k=10):
     Returns:
         DataFrame of POS trigrams with per-class frequencies and log-odds.
     """
-    import spacy
-    nlp = spacy.load("en_core_web_sm", disable=["ner", "lemmatizer"])
+    nlp = _nlp_pos
 
     pos_freqs = {}
     for cls_idx, cls_name in enumerate(class_names):
@@ -440,7 +443,7 @@ def validate_known_ai_isms(ai_texts, human_texts):
 
 def run_full_ai_isms_analysis(texts, class_labels, feature_df, class_names, verbose=True):
     """
-    Master function: runs all five AI-isms detection methods and returns
+    Master function: runs all seven AI-isms detection methods and returns
     a structured results dict.
 
     This is the main entry point called from the notebook.
@@ -454,7 +457,7 @@ def run_full_ai_isms_analysis(texts, class_labels, feature_df, class_names, verb
 
     # 1. Statistical n-gram analysis
     if verbose:
-        print("1/5  Computing log-odds n-gram analysis...")
+        print("1/7  Computing log-odds n-gram analysis...")
     results["log_odds_ngrams"] = compute_log_odds_ngrams(
         ai_texts, human_texts, ns=(1, 2, 3), top_k=30, min_count=3
     )
@@ -463,7 +466,7 @@ def run_full_ai_isms_analysis(texts, class_labels, feature_df, class_names, verb
 
     # 2. Sentence opener entropy
     if verbose:
-        print("2/5  Computing sentence opener entropy...")
+        print("2/7  Computing sentence opener entropy...")
     results["opener_entropy"] = compute_sentence_opener_entropy(
         texts, class_labels, class_names
     )
@@ -473,7 +476,7 @@ def run_full_ai_isms_analysis(texts, class_labels, feature_df, class_names, verb
 
     # 3. Vocabulary divergence
     if verbose:
-        print("3/5  Computing vocabulary divergence (JSD)...")
+        print("3/7  Computing vocabulary divergence (JSD)...")
     results["vocab_divergence"] = compute_vocab_divergence(ai_texts, human_texts)
     if verbose:
         jsd = results["vocab_divergence"]["jsd"]
@@ -482,7 +485,7 @@ def run_full_ai_isms_analysis(texts, class_labels, feature_df, class_names, verb
 
     # 4. POS pattern mining
     if verbose:
-        print("4/5  Mining POS tag patterns (sampling 200 per class)...")
+        print("4/7  Mining POS tag patterns (sampling 200 per class)...")
     results["pos_patterns"] = detect_pos_patterns(
         texts, class_labels, class_names, top_k=10
     )
@@ -492,20 +495,22 @@ def run_full_ai_isms_analysis(texts, class_labels, feature_df, class_names, verb
 
     # 5. Parallel structure detection
     if verbose:
-        print("5/5  Detecting parallel structures...")
+        print("5/7  Detecting parallel structures...")
     results["parallel_structures"] = detect_parallel_structures(
         texts, class_labels, class_names
     )
 
     # 6. Validation against known markers
     if verbose:
-        print("      Validating against known AI-isms from literature...")
+        print("6/7  Validating against known AI-isms from literature...")
     results["known_markers"] = validate_known_ai_isms(ai_texts, human_texts)
     if verbose:
         hits = (results["known_markers"]["ai_hits"] > 0).sum()
         print(f"     {hits}/{len(results['known_markers'])} known markers found in AI text")
 
     # 7. Sentence length variability (from pre-computed features)
+    if verbose:
+        print("7/7  Computing sentence length variability...")
     if "sent_len_std" in feature_df.columns:
         results["sent_len_variability"] = {
             "human_mean_std": round(feature_df.loc[human_mask, "sent_len_std"].mean(), 2),

@@ -6,6 +6,8 @@ import re
 import os
 import json
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -33,12 +35,10 @@ def clean_gutenberg_text(filepath: str) -> str:
 
     if start_match:
         raw = raw[start_match.end():]
-    if end_match:
-        raw = raw[:end_match.start() - (len(raw) - len(raw))]
-        # Re-search on the trimmed text
-        end_match2 = re.search(r"\*\*\* END OF .+? \*\*\*", raw)
-        if end_match2:
-            raw = raw[:end_match2.start()]
+    # Re-search for END marker on the already-trimmed text
+    end_match2 = re.search(r"\*\*\* END OF .+? \*\*\*", raw)
+    if end_match2:
+        raw = raw[:end_match2.start()]
 
     lines = raw.split("\n")
     cleaned_lines = []
@@ -247,8 +247,6 @@ def generate_gemini_paragraphs(
     print(f"Generating {len(work_items)} paragraphs across {len(topics)} topics...")
 
     # Thread-safe lock for results list and file saving
-    import threading
-    from concurrent.futures import ThreadPoolExecutor, as_completed
     lock = threading.Lock()
     save_counter = [0]  # mutable counter for incremental saves
 
