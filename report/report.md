@@ -52,7 +52,10 @@
   - [x] Both types converge at generation 0 (P(Human)>0.90 from initial population)
   - [x] GA exploits brittle Tier A decision boundary
 
-- [ ] **SOP Self-Test** — not yet attempted
+- [x] **SOP Self-Test** — completed
+  - [x] SOP classified as Human by all 3 classifiers (XGB P(Human)=0.993, SBERT=0.997, DistilBERT=Human)
+  - [x] Feature analysis: Flesch=64.7 (human range), low sent_len_std=7.9 (AI-like)
+  - [x] Adversarial rewrite: AI-ified version fooled 2/3 classifiers (XGB and DistilBERT)
 
 ---
 
@@ -338,6 +341,68 @@ This has implications for AI detection: sophisticated style mimicry may actually
 ### Class Imbalance Note
 
 The dataset is heavily imbalanced (5,211 Human vs 500+500 AI). The high accuracy could partly reflect the model's ability to identify the majority class. However, the per-class F1 scores (all >0.99) confirm that the model genuinely separates all three classes, not just defaulting to "Human."
+
+---
+
+## The Personal Test: SOP Self-Test
+
+### Can the detector tell that I'm human?
+
+My Statement of Purpose (789 words, truncated to 200 for classification) was run through all three classifier tiers.
+
+**Results — Original SOP:**
+
+| Classifier | Prediction | P(Human) | P(GenAI) | P(StyleAI) |
+|-----------|-----------|---------|---------|-----------|
+| XGBoost (Tier A) | **Human** | 0.993 | 0.007 | 0.000 |
+| SBERT FF-NN (Tier B) | **Human** | 0.997 | 0.002 | 0.001 |
+| DistilBERT+LoRA (Tier C) | **Human** | — | — | — |
+
+**Verdict: 3/3 classifiers say Human.** My writing passes cleanly.
+
+### Why does the detector say Human?
+
+Feature comparison between my SOP and the training data class averages:
+
+| Feature | My SOP | Human avg | GenAI avg | StyleAI avg |
+|---------|--------|-----------|-----------|-------------|
+| flesch_reading_ease | 64.7 | 66.8 | 46.4 | 50.5 |
+| avg_sent_len | 15.5 | 28.2 | 26.9 | 30.9 |
+| sent_len_std | 7.9 | 14.3 | 7.6 | 10.5 |
+| hapax_ratio | 0.84 | 0.81 | 0.87 | 0.88 |
+| mattr | 0.87 | 0.82 | 0.84 | 0.84 |
+
+**Key insight:** My Flesch Reading Ease (64.7) is squarely in the human range (~67), while AI text scores 46-50. This is the #1 feature driving the Human prediction (confirmed by SHAP). However, my sentence length variance (7.9) is actually closer to AI (7.6) than to the human corpus average (14.3) — my academic writing is more uniform than Victorian prose, but the readability signal dominates.
+
+### Adversarial rewrite: Can I fool my own detector?
+
+Since the SOP was classified as Human, I rewrote the opening in deliberate LLM style — hedging phrases ("it is important to note"), buzzwords ("tapestry", "delve", "crucial"), rigid parallel structure, and no personality:
+
+> *"It is important to note that my motivation for applying to the PreCog Lab stems from a deep-seated passion for understanding the intersection of natural language processing and societal impact. Furthermore, I believe that the crucial role played by computational linguistics in today's world cannot be understated. Throughout my academic journey, I have delved into various aspects of machine learning, gaining valuable insights into the tapestry of modern AI research..."*
+
+**Results — AI-ified rewrite:**
+
+| Classifier | Prediction | P(Human) |
+|-----------|-----------|---------|
+| XGBoost (Tier A) | **Generic AI** | 0.001 |
+| SBERT FF-NN (Tier B) | **Human** | 1.000 |
+| DistilBERT+LoRA (Tier C) | **Generic AI** | 0.001 |
+
+**P(Human) change:** XGBoost dropped from 0.993 to 0.001 — a complete inversion.
+
+**2/3 classifiers fooled.** The AI-ified rewrite successfully triggered detection by XGBoost and DistilBERT. But SBERT (embedding-based) was immune — it still saw Human with P=1.000.
+
+### What this proves
+
+The "ghost" works both ways:
+1. **AI text can be engineered to fool statistical detectors** (as shown by the GA and prompt engineering experiments)
+2. **Human text can be made to look like AI** by adopting LLM writing patterns — hedging, buzzwords, rigid structure, no voice
+
+The divergence between classifiers is telling:
+- **Tier A (XGBoost)** and **Tier C (DistilBERT)** are sensitive to surface patterns — vocabulary choice, sentence structure, readability scores. These are the same features that SHAP identified as important, and they're exactly what the adversarial rewrite manipulated.
+- **Tier B (SBERT)** captures deeper semantic meaning through sentence embeddings. Adding "furthermore" and "it is important to note" doesn't change the underlying semantic content, so SBERT sees through the disguise.
+
+This has practical implications: a robust AI detector should combine statistical features with embedding-based models. Neither alone is sufficient — statistical models catch the obvious cases but can be fooled by style transfer, while embedding models are more robust but may miss cases where the semantic content itself is AI-generated.
 
 ---
 
