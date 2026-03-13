@@ -75,6 +75,8 @@ uv run python -m nltk.downloader punkt averaged_perceptron_tagger stopwords
 
 Open `notebooks/ghost_in_the_machine.ipynb` and run cells sequentially. All results, plots, and metrics are displayed inline. Helper modules in `src/` are imported automatically.
 
+**Saved outputs:** All intermediate results (cleaned texts, generated AI paragraphs, feature matrices, figures, model predictions) are pre-computed and committed to the repository. The notebook uses checkpoint logic — if a saved output exists, it loads from disk instead of recomputing. This means you can review the full pipeline in minutes without any API keys or GPU. To regenerate any step from scratch, simply delete the corresponding checkpoint file and re-run (see the reproducibility table inside the notebook for details).
+
 ## Tasks and Approach
 
 - **Task 0 — Dataset Construction:** Clean Gutenberg texts, extract topics via BERTopic, generate AI paragraphs with Gemini (generic + style-mimicking). Three classes: Human, Generic AI, Style-Mimicking AI.
@@ -86,9 +88,9 @@ Open `notebooks/ghost_in_the_machine.ipynb` and run cells sequentially. All resu
 ## Key Findings
 
 - **Round 1 (naive prompts): >99% accuracy across all tiers** — but this was a red flag, not a success. The AI text was trivially detectable due to vocabulary homogeneity, readability overshoot, and uniform sentence structure.
-- **Round 2 (research-grade prompts): accuracy dropped to ??%** — few-shot ICL with real Victorian excerpts, persona prompting, CoT reasoning, and anti-detection constraints made AI text significantly harder to detect. *[To be updated after Colab re-run]*
+- **Round 2 (research-grade prompts): XGBoost 3-class accuracy dropped to 96.67%** — few-shot ICL with real Victorian excerpts, persona prompting, CoT reasoning, and anti-detection constraints made AI text significantly harder to detect. The -2.90% accuracy and -0.108 F1 drop prove prompt engineering matters.
 - **Prompt engineering is the battleground** — the accuracy delta between Round 1 and Round 2 proves that prompt design, not model architecture, determines detection difficulty.
-- **Handcrafted features are surprisingly competitive** — XGBoost reaches 99.57% 3-class accuracy using only 23 interpretable features. AI text has measurable statistical fingerprints.
+- **Handcrafted features are surprisingly competitive** — XGBoost reaches 96.67% 3-class accuracy using only 23 interpretable features. AI text has measurable statistical fingerprints even under adversarial prompt engineering.
 - **SHAP reveals key discriminators:** Flesch Reading Ease dominates (~40% of discriminative power), followed by sentence length, em-dash density, and hapax ratio.
 - **Style mimicry overshoots** — Gemini's "Victorian style" text is statistically *more extreme* than real Victorian prose (Flesch ~0 vs Human ~60), making it paradoxically easier to detect.
 - **GA adversarial attacks** use Gemini-powered mutations (Type A: rhythm rewriting vs Type B: archaic injection) to evolve AI text past classifiers, testing fragility across all tiers.

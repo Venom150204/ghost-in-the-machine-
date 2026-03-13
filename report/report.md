@@ -10,7 +10,7 @@
 ## Page 1: Task Completion Status
 
 - [x] **Task 0: Dataset Construction** — completed
-  - [x] Gutenberg text acquisition (Dickens: *Bleak House*; Shelley: *Frankenstein*, *The Last Man*)
+  - [x] Gutenberg text acquisition (Dickens: *Bleak House*, *Great Expectations*; Shelley: *Frankenstein*, *The Last Man*)
   - [x] Text cleaning and paragraph chunking (5,211 human chunks)
   - [x] BERTopic topic extraction (7 topics discovered)
   - [x] NER-based character name auto-detection (general, not hardcoded)
@@ -27,8 +27,8 @@
   - [x] PCA + t-SNE visualization
 
 - [x] **Task 2 Tier A: XGBoost + Random Forest** — completed
-  - [x] Binary classification (Human vs AI): ~99.9% accuracy
-  - [x] 3-class classification (Human / Generic AI / Style-Mimicking AI): ~99.7% accuracy
+  - [x] Binary classification (Human vs AI): 98.50% accuracy (Round 2)
+  - [x] 3-class classification (Human / Generic AI / Style-Mimicking AI): 96.67% accuracy (Round 2)
   - [x] SHAP analysis on XGBoost 3-class model
 
 - [x] **Task 2 Tier B: FF-NN on GloVe / SBERT** — completed
@@ -63,7 +63,7 @@
 
 ### Dataset Construction (Task 0)
 
-**Author Selection:** Charles Dickens (*Bleak House*) and Mary Shelley (*Frankenstein*, *The Last Man*) were chosen for their contrasting Victorian-era styles — Dickens for elaborate social commentary prose with heavy dialogue, Shelley for Gothic Romantic narrative with introspective philosophical passages. Both are sufficiently distinct that a 3-class classifier must learn genuine stylistic features rather than trivial content cues.
+**Author Selection:** Charles Dickens (*Bleak House*, *Great Expectations*) and Mary Shelley (*Frankenstein*, *The Last Man*) were chosen for their contrasting Victorian-era styles — Dickens for elaborate social commentary prose with heavy dialogue, Shelley for Gothic Romantic narrative with introspective philosophical passages. Both are sufficiently distinct that a 3-class classifier must learn genuine stylistic features rather than trivial content cues.
 
 **Chunking Strategy:** Raw Gutenberg texts were cleaned (headers/footers stripped, encoding normalized) and split into paragraph-level chunks of 80-300 words. This window size preserves enough syntactic and stylistic signal for feature extraction while being comparable to typical AI-generated paragraph lengths.
 
@@ -334,7 +334,7 @@ The dominant insight from Task 1 and Task 2 is that AI-generated text fails at m
 
 ### Style Mimicry Failure
 
-The 3-class accuracy (~99.7%) reveals that simply prompting an LLM to "write in the style of Dickens" produces text that is statistically *more different* from real Dickens than generic AI text in some dimensions. The style-mimicking AI overshoots — it may use longer sentences and archaic words, but it does so with machine-like regularity that makes it even more detectable.
+The Round 1 3-class accuracy (~99.7%) reveals that simply prompting an LLM to "write in the style of Dickens" produces text that is statistically *more different* from real Dickens than generic AI text in some dimensions. The style-mimicking AI overshoots — it may use longer sentences and archaic words, but it does so with machine-like regularity that makes it even more detectable.
 
 This has implications for AI detection: sophisticated style mimicry may actually make AI text *easier* to detect if the detector uses the right features.
 
@@ -408,18 +408,37 @@ This has practical implications: a robust AI detector should combine statistical
 
 ## What I Would Do Differently / Next Steps
 
-1. **Cross-model evaluation:** Train on one LLM's output, test on another's. Current results are Gemini-specific — would the XGBoost detector trained on Gemini output also catch GPT-4 or Claude-generated text?
+1. **Cross-model evaluation:** Train on one LLM's output, test on another's. Current results are Gemini-specific — would the XGBoost detector trained on Gemini output also catch GPT-4 or other LLM-generated text?
 
 2. **Reduce class imbalance:** Either downsample Human to 500 or generate more AI paragraphs. The current 5:1:1 ratio, while handled correctly, may affect model calibration.
 
-4. **Human baseline study:** Have human readers attempt the same classification task to establish a human performance ceiling. If humans can't distinguish the classes either, 99.7% accuracy is less impressive.
+3. **Human baseline study:** Have human readers attempt the same classification task to establish a human performance ceiling. If humans can't distinguish the classes either, high accuracy is less impressive.
 
-5. **Feature ablation study:** Systematically remove feature groups (e.g., remove all punctuation features) to quantify their contribution beyond SHAP values.
+4. **Feature ablation study:** Systematically remove feature groups (e.g., remove all punctuation features) to quantify their contribution beyond SHAP values.
 
-6. **Longer text evaluation:** Test whether classification remains accurate at shorter text lengths (single sentences, 20-word fragments). Understanding the minimum text length for reliable detection has practical applications.
+5. **Longer text evaluation:** Test whether classification remains accurate at shorter text lengths (single sentences, 20-word fragments). Understanding the minimum text length for reliable detection has practical applications.
 
-7. **Domain transfer:** Would features trained on Victorian prose transfer to detecting AI-generated modern text (blog posts, news articles)?
+6. **Domain transfer:** Would features trained on Victorian prose transfer to detecting AI-generated modern text (blog posts, news articles)?
 
 ---
 
-*This report is updated incrementally as experiments complete. Sections below this line will be filled as Tiers B, C, Task 3, and Task 4 are executed.*
+## Reproducibility
+
+Every computationally expensive step uses checkpoint logic: if the output file exists, it loads from disk; if not, it recomputes from scratch. All intermediate results — cleaned texts, generated AI paragraphs, feature matrices, model predictions, and figures — are committed to the repository. This means the notebook can be reviewed end-to-end by simply running cells sequentially, loading from saved checkpoints in minutes without any API keys or GPU.
+
+To regenerate any component from scratch, delete the relevant checkpoint file and re-run:
+
+| Component | Checkpoint file(s) | Requirements | Approx. time |
+|-----------|-------------------|--------------|--------------|
+| AI paragraphs (1,000) | `data/generated/class{2,3}_raw.json` | Gemini API key | ~17 min (10 concurrent workers) |
+| Feature extraction (23 features × 6,211 samples) | `outputs/results/feature_matrix.csv` | spaCy `en_core_web_sm` | ~10 min |
+| Tier A (XGBoost/RF) | Retrained each run | None | ~3 min |
+| Tier B (GloVe/SBERT FF-NN) | Retrained each run | GloVe embeddings (331 MB download) | ~5 min |
+| Tier C (DistilBERT+LoRA) | `outputs/models/distilbert_lora_*` | GPU (Colab recommended) | ~20 min |
+| BERTopic topics | `outputs/results/bertopic_topics.pkl` | None | ~5 min |
+| GA adversarial attack | Runs fresh each time | Gemini API key | ~12 min |
+
+**Large files excluded from the repository** (gitignored): GloVe embeddings (`glove.6B.100d.txt`, 331 MB — download from [Stanford NLP GloVe](https://nlp.stanford.edu/projects/glove/)), BERTopic model (117 MB — regenerated automatically), DistilBERT+LoRA checkpoints (requires GPU retraining), and SBERT embeddings (9 MB — regenerated during Tier B training).
+
+---
+

@@ -31,14 +31,11 @@ def clean_gutenberg_text(filepath: str) -> str:
 
     # Strip Gutenberg header and footer
     start_match = re.search(r"\*\*\* START OF .+? \*\*\*", raw)
-    end_match = re.search(r"\*\*\* END OF .+? \*\*\*", raw)
-
     if start_match:
         raw = raw[start_match.end():]
-    # Re-search for END marker on the already-trimmed text
-    end_match2 = re.search(r"\*\*\* END OF .+? \*\*\*", raw)
-    if end_match2:
-        raw = raw[:end_match2.start()]
+    end_match = re.search(r"\*\*\* END OF .+? \*\*\*", raw)
+    if end_match:
+        raw = raw[:end_match.start()]
 
     lines = raw.split("\n")
     cleaned_lines = []
@@ -173,7 +170,7 @@ def generate_gemini_paragraphs(
     prompt_template: str,
     total_count: int,
     output_path: str,
-    model_name: str = "gemini-2.5-flash",
+    model_name: str = "gemini-2.5-flash-lite",
     rate_limit_sleep: float = 0.1,
     temperature: float = 0.8,
     max_output_tokens: int = 300,

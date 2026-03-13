@@ -14,7 +14,6 @@ not by mutating a single seed text.
 import os
 import time
 import random
-import json
 import numpy as np
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -34,7 +33,7 @@ class TextGeneticAlgorithm:
         classifier_fn,
         topic,
         author_style_prompt,
-        model_name="gemini-2.5-flash",
+        model_name="gemini-2.5-flash-lite",
         population_size=10,
         elite_size=3,
         max_generations=10,
@@ -263,7 +262,7 @@ def run_comparative_ga(
     classifier_fn,
     topic,
     author_style_prompt,
-    model_name="gemini-2.5-flash",
+    model_name="gemini-2.5-flash-lite",
     population_size=10,
     elite_size=3,
     max_generations=10,
